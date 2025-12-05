@@ -5,7 +5,7 @@ from tqdm import tqdm
 import soundfile as sf
 
 # ========== CONFIG ==========
-HF_TOKEN = "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"
+HF_TOKEN = ""
 HF_DATASET = "JayLL13/dolly-audio-Mature-Woman"     # ví dụ: "librispeech_asr"
 HF_SPLIT = "train"                       # train / validation / test
 PARENT_DIR = "/mnt/d/tts_dataset/"                   # folder output
