@@ -7,7 +7,7 @@ max_seq_len: 2048     # Maximum sequence length
 
 # Dataset Configuration
 # Option 1: Use pre-encoded pickle file (faster, but requires pre-processing)
-dataset_path: "vietnamese_dataset.pkl"
+dataset_path: "/mnt/d/tts_dataset/vietnamese_dataset.pkl"  # Pre-encoded dataset
 
 # Option 2: Use CSV metadata for ON-THE-FLY encoding (RECOMMENDED - no pre-processing needed!)
 #dataset_path: "vietnamese_dataset.pkl"
@@ -23,10 +23,10 @@ warmup_ratio: 0.05             # Warmup ratio (5% of total steps)
 
 # Training configuration
 per_device_train_batch_size: 4  # Batch size per GPU
-gradient_accumulation_steps: 1   # Accumulate gradients over N steps (effective batch = 2 * 4 = 8)
-num_train_epochs: 3              # Number of epochs to train
+gradient_accumulation_steps: 2   # Accumulate gradients over N steps (effective batch = 2 * 4 = 8)
+num_train_epochs: 5              # Number of epochs to train
 logging_steps: 100                # Log every N steps
-save_steps: 10000                 # Save checkpoint every N steps
+save_steps: 5000                 # Save checkpoint every N steps
 eval_steps: 10000                 # Evaluate every N steps (if eval dataset exists)
 
 # Output
@@ -34,5 +34,5 @@ save_root: "./checkpoints"      # Root directory for checkpoints
 run_name: "neutts-vietnamese"   # Name of this training run
 
 # Other
-seed: 1337                      # Random seed for reproducibility
+seed: 1303                      # Random seed for reproducibility
 

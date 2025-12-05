@@ -69,9 +69,9 @@ Pre-encode toàn bộ dataset 1 lần để training nhanh gấp 10x:
 
 ```bash
 python prepare_vietnamese_dataset.py \
-    --metadata "/path/to/metadata.csv" \
-    --audio_dir "/path/to/wavs" \
-    --output "vietnamese_dataset.pkl" \
+    --metadata "/mnt/d/tts_dataset/metadata.csv" \
+    --audio_dir "/mnt/d/tts_dataset/wavs" \
+    --output "/mnt/d/tts_dataset/vietnamese_dataset.pkl" \
     --device "cuda"
 ```
 
@@ -84,7 +84,7 @@ Sửa `finetune_vietnamese_config.yaml`:
 
 ```yaml
 # Dataset
-dataset_path: "vietnamese_dataset.pkl"  # Pre-encoded dataset
+dataset_path: "/mnt/d/tts_dataset/vietnamese_dataset.pkl"  # Pre-encoded dataset
 
 # Training
 per_device_train_batch_size: 4
