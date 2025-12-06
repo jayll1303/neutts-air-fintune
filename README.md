@@ -69,10 +69,11 @@ Pre-encode toàn bộ dataset 1 lần để training nhanh gấp 10x:
 
 ```bash
 python prepare_vietnamese_dataset.py \
-    --metadata "/mnt/d/tts_dataset/metadata.csv" \
-    --audio_dir "/mnt/d/tts_dataset/wavs" \
-    --output "/mnt/d/tts_dataset/vietnamese_dataset.pkl" \
-    --device "cuda"
+    --metadata "/mnt/d/tts_dataset_all/metadata.csv" \
+    --audio_dir "/mnt/d/tts_dataset_all/wavs" \
+    --output "/mnt/d/tts_dataset_all/vietnamese_dataset.pkl" \
+    --device "cuda" \
+    --batch_size 40
 ```
 
 **Thời gian:** ~36-40 giờ cho 2.6M samples (chạy qua đêm)  
@@ -401,6 +402,43 @@ python infer_vietnamese.py \
     --checkpoint "./checkpoints/neutts-vietnamese/checkpoint-50000" \
     --temperature 0.7 \
     --top_k 50
+```
+
+### Push to Hugging Face
+
+Upload latest checkpoint:
+
+```bash
+python push_to_huggingface.py \
+    --repo-id YOUR_USERNAME/neutts-vietnamese \
+    --token YOUR_HF_TOKEN
+```
+
+Upload a specific checkpoint:
+
+```bash
+python push_to_huggingface.py \
+    --repo-id YOUR_USERNAME/neutts-vietnamese \
+    --token YOUR_HF_TOKEN \
+    --checkpoint checkpoint-50000
+```
+
+Upload ALL checkpoints (each in its own subfolder):
+
+```bash
+python push_to_huggingface.py \
+    --repo-id YOUR_USERNAME/neutts-vietnamese \
+    --token YOUR_HF_TOKEN \
+    --all
+```
+
+By default, it will push to private repo, to push to public repo, add `--public` flag.
+
+```bash
+python push_to_huggingface.py \
+    --repo-id YOUR_USERNAME/neutts-vietnamese \
+    --token YOUR_HF_TOKEN \
+    --public
 ```
 
 ## 🤝 Contributing

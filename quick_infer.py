@@ -32,11 +32,11 @@ def main():
         "Chào Anh HOÀNG VĂN NAM, Em là Trang gọi từ công ty tài chính ép e CREDIT, rất vui được kết nối với Anh. ",
         "Cho em xin ít phút để trao đổi về hợp đồng Thẻ tín dụng của mình nha Anh?",
         "Dạ, Anh HOÀNG VĂN NAM có hợp đồng Thẻ tín dụng tại ép e CREDIT.",
-        "Ngày đến hạn thanh toán là ngày mười hai tuy nhiên hợp đồng đang trễ hạn hai ngày với số tiền cần thanh toán là không đồng.",
+        "Ngày đến hạn thanh toán là ngày mười hai , tuy nhiên , hợp đồng đang trễ hạn hai ngày với số tiền cần thanh toán là mười hai ngìn đồng.",
         "Dạ, em xin cung cấp thông tin tới Anh.",
         "Hôm nay là ngày thứ tư và Anh cần đi thanh toán chậm nhất ngày mười hai nha Anh.",
         "Anh thu xếp đóng tiền sớm trong hôm nay cho bên em nha.",
-        "Anh cố gắng thu xếp thanh toán trước ngày 12 qua mô mô, hoặc thế giới di động.",
+        "Anh cố gắng thu xếp thanh toán trước ngày mười hai qua mô mô, hoặc thế giới di động.",
         "Thanh toán xong giữ lại biên lai giúp em.",
         "Cảm ơn và chúc Anh một ngày tốt lành."
     ]

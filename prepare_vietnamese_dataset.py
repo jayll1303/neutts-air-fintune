@@ -2,26 +2,46 @@
 Script to prepare Vietnamese dataset for NeuTTS-Air finetuning.
 This script:
 1. Reads metadata.csv
-2. Encodes all audio files using NeuCodec
+2. Encodes all audio files using NeuCodec (with batch processing)
 3. Saves the encoded dataset as a pickle file
+
+Optimized for large datasets (600k+ samples):
+- No file existence check during metadata reading (handled during encoding)
+- No sorting by file size (avoids 600k+ getsize calls)
+- Parallel audio loading with ThreadPoolExecutor
 """
 
 import os
 import csv
 import torch
 import pickle
+import numpy as np
 from tqdm import tqdm
 from librosa import load
 from neucodec import NeuCodec
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def encode_audio_file(audio_path, codec):
+# NeuCodec downsampling ratio (16kHz / 50Hz = 320)
+DOWNSAMPLE_RATIO = 320
+
+
+def load_audio(path):
+    """Load a single audio file. Returns (wav, length) or (None, 0) on error."""
+    try:
+        wav, _ = load(path, sr=16000, mono=True)
+        return wav, len(wav)
+    except Exception as e:
+        return None, 0
+
+
+def encode_audio_file(audio_path, codec, device):
     """Encode a single audio file using NeuCodec."""
     try:
         # Load audio at 16kHz (required by NeuCodec)
         wav, _ = load(audio_path, sr=16000, mono=True)
         
         # Convert to tensor format [1, 1, T]
-        wav_tensor = torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0)
+        wav_tensor = torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0).to(device)
         
         # Encode to codes
         with torch.no_grad():
@@ -35,7 +55,50 @@ def encode_audio_file(audio_path, codec):
         print(f"Error encoding {audio_path}: {e}")
         return None
 
-def prepare_dataset(metadata_path, audio_dir, output_path, device="cuda"):
+
+def encode_audio_batch_parallel(audio_paths, codec, device, num_workers=4):
+    """
+    Load audio files in parallel, encode sequentially.
+    NeuCodec doesn't support batch encoding, but parallel I/O speeds things up.
+    
+    Args:
+        audio_paths: List of paths to audio files
+        codec: NeuCodec model
+        device: Device to use (passed to codec)
+        num_workers: Number of threads for parallel audio loading
+    
+    Returns:
+        List of codes for each audio
+    """
+    n = len(audio_paths)
+    wavs = [None] * n
+    
+    # Parallel load all audio files
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        futures = {executor.submit(load_audio, path): i for i, path in enumerate(audio_paths)}
+        for future in as_completed(futures):
+            idx = futures[future]
+            wav, _ = future.result()
+            wavs[idx] = wav
+    
+    # Sequential encode (NeuCodec doesn't support batch)
+    results = []
+    for i, wav in enumerate(wavs):
+        if wav is not None:
+            try:
+                wav_tensor = torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0)
+                with torch.no_grad():
+                    codes = codec.encode_code(audio_or_path=wav_tensor).squeeze(0).squeeze(0)
+                results.append(codes.cpu().numpy().tolist())
+            except Exception as e:
+                results.append(None)
+        else:
+            results.append(None)
+    
+    return results
+
+
+def prepare_dataset(metadata_path, audio_dir, output_path, device="cuda", batch_size=1, num_workers=4):
     """
     Prepare the Vietnamese dataset.
     
@@ -44,6 +107,8 @@ def prepare_dataset(metadata_path, audio_dir, output_path, device="cuda"):
         audio_dir: Directory containing audio files
         output_path: Path to save the encoded dataset
         device: Device to use for encoding (cuda/cpu)
+        batch_size: Number of audio files to encode in parallel
+        num_workers: Number of threads for parallel audio loading
     """
     print("=" * 60)
     print("PREPARING VIETNAMESE DATASET FOR NEUTTS-AIR")
@@ -55,7 +120,7 @@ def prepare_dataset(metadata_path, audio_dir, output_path, device="cuda"):
     codec.eval().to(device)
     print("✓ NeuCodec loaded successfully!")
     
-    # Read metadata
+    # Read metadata (FAST - no file existence check)
     print(f"\n[2/4] Reading metadata from {metadata_path}...")
     dataset = []
     
@@ -64,12 +129,7 @@ def prepare_dataset(metadata_path, audio_dir, output_path, device="cuda"):
         for row in reader:
             audio_file = row['audio']
             transcript = row['transcript']
-            
             audio_path = os.path.join(audio_dir, audio_file)
-            
-            if not os.path.exists(audio_path):
-                print(f"⚠️  Warning: Audio file not found: {audio_path}")
-                continue
             
             dataset.append({
                 'audio_file': audio_file,
@@ -79,22 +139,45 @@ def prepare_dataset(metadata_path, audio_dir, output_path, device="cuda"):
     
     print(f"✓ Found {len(dataset)} samples")
     
-    # Encode all audio files
-    print(f"\n[3/4] Encoding audio files with NeuCodec...")
+    # Encode audio files (no sorting - avoids 600k+ getsize calls)
+    print(f"\n[3/4] Encoding audio files with NeuCodec (batch_size={batch_size}, workers={num_workers})...")
+    
     encoded_dataset = []
+    error_count = 0
     
-    for sample in tqdm(dataset, desc="Encoding"):
-        codes = encode_audio_file(sample['audio_path'], codec)
-        
-        if codes is not None:
-            encoded_dataset.append({
-                'audio_file': sample['audio_file'],
-                'text': sample['text'],
-                'codes': codes
-            })
-        else:
-            print(f"⚠️  Skipping {sample['audio_file']} due to encoding error")
+    if batch_size > 1:
+        # Batch processing with parallel loading
+        for i in tqdm(range(0, len(dataset), batch_size), desc="Encoding batches"):
+            batch_samples = dataset[i:i + batch_size]
+            batch_paths = [s['audio_path'] for s in batch_samples]
+            
+            codes_list = encode_audio_batch_parallel(batch_paths, codec, device, num_workers)
+            
+            for sample, codes in zip(batch_samples, codes_list):
+                if codes is not None:
+                    encoded_dataset.append({
+                        'audio_file': sample['audio_file'],
+                        'text': sample['text'],
+                        'codes': codes
+                    })
+                else:
+                    error_count += 1
+    else:
+        # Single file processing (original behavior)
+        for sample in tqdm(dataset, desc="Encoding"):
+            codes = encode_audio_file(sample['audio_path'], codec, device)
+            
+            if codes is not None:
+                encoded_dataset.append({
+                    'audio_file': sample['audio_file'],
+                    'text': sample['text'],
+                    'codes': codes
+                })
+            else:
+                error_count += 1
     
+    if error_count > 0:
+        print(f"⚠️  Skipped {error_count} files due to errors")
     print(f"✓ Successfully encoded {len(encoded_dataset)} samples")
     
     # Save dataset
@@ -155,6 +238,18 @@ if __name__ == "__main__":
         choices=["cuda", "cpu"],
         help="Device to use for encoding"
     )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=8,
+        help="Number of audio files to encode in parallel (default: 8)"
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=8,
+        help="Number of threads for parallel audio loading (default: 8)"
+    )
     
     args = parser.parse_args()
     
@@ -162,6 +257,7 @@ if __name__ == "__main__":
         metadata_path=args.metadata,
         audio_dir=args.audio_dir,
         output_path=args.output,
-        device=args.device
+        device=args.device,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers
     )
-

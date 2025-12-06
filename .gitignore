@@ -217,7 +217,9 @@ wavs/
 metadata.csv
 *.pkl
 checkpoints/
+checkpoints_all/
 output*.wav
+scripts.sh
 
 # IDE
 .idea/
